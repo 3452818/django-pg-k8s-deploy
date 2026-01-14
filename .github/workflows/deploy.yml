@@ -61,7 +61,6 @@ jobs:
           --namespace default \
           --create-namespace \
           --set image.tag=${{ steps.tag.outputs.TAG }} \
-
           --wait \
           --timeout 300s 
 
