@@ -1,6 +1,6 @@
 # helm/django-pg-app/values.yaml
 image:
-  repository: ghcr.io/¬¿ÿ_Õ» /django-pg-k8s-deploy
+  repository: ghcr.io/3452818/django-pg-k8s-deploy
   tag: latest
   pullPolicy: IfNotPresent
 
