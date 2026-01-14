@@ -1,0 +1,6 @@
+# helm/django-pg-app/Chart.yaml
+apiVersion: v2
+name: django-pg-app
+description: A Django app with PostgreSQL backend, deployed on Kubernetes
+type: application
+version: 0.1.0

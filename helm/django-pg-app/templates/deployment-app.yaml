@@ -1,0 +1,41 @@
+# helm/django-pg-app/templates/deployment-app.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: django-pg-app
+  labels:
+    app: django-pg-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: django-pg-app
+  template:
+    metadata:
+      labels:
+        app: django-pg-app
+    spec:
+      containers:
+      - name: django-app
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        ports:
+        - containerPort: {{ .Values.app.port }}
+        env:
+        - name: DB_HOST
+          value: "{{ .Values.app.env.DB_HOST }}"
+        - name: DB_NAME
+          value: "{{ .Values.app.env.DB_NAME }}"
+        - name: DB_USER
+          value: "{{ .Values.app.env.DB_USER }}"
+        - name: DB_PASS
+          value: "{{ .Values.app.env.DB_PASS }}"
+        securityContext:
+          runAsUser: 1000
+          runAsGroup: 1000
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"

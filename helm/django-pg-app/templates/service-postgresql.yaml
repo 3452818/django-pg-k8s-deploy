@@ -1,0 +1,14 @@
+# helm/django-pg-app/templates/service-postgresql.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: django-pg-app-postgresql
+  labels:
+    app: django-pg-app-postgresql
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+  selector:
+    app: django-pg-app-postgresql
