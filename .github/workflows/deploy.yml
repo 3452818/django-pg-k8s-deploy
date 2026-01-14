@@ -63,7 +63,10 @@ jobs:
           --set image.tag=${{ steps.tag.outputs.TAG }} \
           --set postgres.persistence.size=1Gi \
           --wait \
-          --timeout 300s
+          --timeout 300s \
+          --kubeconfig ~/.kube/config \
+          --kube-context k8s-context
+
     - name: Show deployed resources
       run: |
         kubectl get pods -n default
