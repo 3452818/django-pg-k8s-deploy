@@ -67,11 +67,6 @@ jobs:
             token: ${{ secrets.K8S_TOKEN }}
         EOF
 
-    - name: Install PostgreSQL Helm dependency (optional, if using external chart)
-      run: |
-        helm repo add bitnami https://charts.bitnami.com/bitnami
-        helm dependency update
-
     - name: Deploy with Helm
       run: |
         helm upgrade --install django-pg-app ./helm/django-pg-app \
