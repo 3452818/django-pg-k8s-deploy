@@ -22,7 +22,8 @@ postgres:
     POSTGRES_USER: vinhle
     POSTGRES_PASSWORD: password
   persistence:
-    enabled: false
+    enabled: true
+    storageClass: ""
     size: 1Gi
   service:
     port: 5432

@@ -61,11 +61,9 @@ jobs:
           --namespace default \
           --create-namespace \
           --set image.tag=${{ steps.tag.outputs.TAG }} \
-          --set postgres.persistence.size=1Gi \
+
           --wait \
-          --timeout 300s \
-          --kubeconfig ~/.kube/config \
-          --kube-context k8s-context
+          --timeout 300s 
 
     - name: Show deployed resources
       run: |
