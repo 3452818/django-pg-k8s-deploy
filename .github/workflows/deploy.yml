@@ -3,77 +3,106 @@ on:
   push:
     tags:
       - "v*"
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     environment: production
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    - name: Login to GitHub Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.DOCKER_REGISTRY_TOKEN }}
-    - name: Extract Git tag
-      id: tag
-      run: |
-        echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: ./Dockerfile
-        push: true
-        tags: ghcr.io/${{ github.repository }}:${{ steps.tag.outputs.TAG }}
-    - name: Install Helm
-      uses: azure/setup-helm@v4
-    - name: Configure Kubeconfig
-      run: |
-        mkdir -p ~/.kube
-        cat > ~/.kube/config <<EOF
-        apiVersion: v1
-        clusters:
-        - cluster:
-            server: https://localhost:8443
-            certificate-authority-data: ${{ secrets.K8S_CA_CERT }}
-          name: k8s-cluster
-        contexts:
-        - context:
-            cluster: k8s-cluster
-            user: k8s-user
-          name: k8s-context
-        current-context: k8s-context
-        kind: Config
-        users:
-        - name: k8s-user
-          user:
-            token: ${{ secrets.K8S_TOKEN }}
-        EOF
-    # Запускаем SSH-туннель в фоне (перенаправляем localhost:8443 > 192.168.10.27:6443)
-        ssh -f -N -L 8443:192.168.10.27:6443 ubuntu@178.154.228.207 -i <(echo "${{ secrets.SSH_PRIVATE_KEY }}")
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    # Ждём, пока туннель заработает
-       sleep 10
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
-    # Проверяем, что туннель работает
-       curl -k https://localhost:8443/healthz
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Deploy with Helm
-      run: |
-        helm upgrade --install django-pg-app ./helm/django-pg-app \
-          --namespace default \
-          --create-namespace \
-          --set image.tag=${{ steps.tag.outputs.TAG }} \
-          --wait \
-          --timeout 300s 
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.DOCKER_REGISTRY_TOKEN }}
 
-    - name: Show deployed resources
-      run: |
-        kubectl get pods -n default
-        kubectl get svc -n default
+      - name: Extract Git tag
+        id: tag
+        run: |
+          echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ steps.tag.outputs.TAG }}
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Configure Kubeconfig and establish SSH tunnel
+        run: |
+          mkdir -p ~/.kube
+          cat > ~/.kube/config <<EOF
+          apiVersion: v1
+          clusters:
+          - cluster:
+              server: https://localhost:8443
+              certificate-authority-data: ${{ secrets.K8S_CA_CERT }}
+            name: k8s-cluster
+          contexts:
+          - context:
+              cluster: k8s-cluster
+              user: k8s-user
+            name: k8s-context
+          current-context: k8s-context
+          kind: Config
+          users:
+          - name: k8s-user
+            user:
+              token: ${{ secrets.K8S_TOKEN }}
+          EOF
+
+          # Запускаем SSH-туннель в фоне без -f, чтобы он не умирал после шага
+          # Используем ssh -N -L для проброса порта, но без -f — GitHub Actions не поддерживает долгоживущие фоновые процессы
+          # Поэтому запускаем туннель в фоне с & и ждём, пока порт станет доступен
+          ssh -N -L 8443:192.168.10.27:6443 ubuntu@178.154.228.207 -i <(echo "${{ secrets.SSH_PRIVATE_KEY }}") &
+          SSH_PID=$!
+
+          # Ждём, пока туннель установится (максимум 30 секунд)
+          echo "Ожидание установки SSH-туннеля..."
+          for i in {1..30}; do
+            if echo exit | telnet localhost 8443 2>/dev/null; then
+              echo "SSH-туннель успешно установлен!"
+              break
+            fi
+            echo "Ожидание... ($i/30)"
+            sleep 1
+          done
+
+          # Проверяем доступность Kubernetes API через туннель
+          echo "Проверка доступности Kubernetes API..."
+          if kubectl cluster-info 2>/dev/null; then
+            echo "Kubernetes API доступен через туннель."
+          else
+            echo "Ошибка: Kubernetes API недоступен."
+            exit 1
+          fi
+
+          # Убиваем SSH-туннель после завершения шага (он автоматически убьётся, но явно для чистоты)
+          kill $SSH_PID 2>/dev/null || true
+
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install django-pg-app ./helm/django-pg-app \
+            --namespace default \
+            --create-namespace \
+            --set image.tag=${{ steps.tag.outputs.TAG }} \
+            --wait \
+            --timeout 300s
+
+      - name: Show deployed resources
+        run: |
+          kubectl get pods -n default
+          kubectl get svc -n default
