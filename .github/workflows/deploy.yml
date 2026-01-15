@@ -50,7 +50,7 @@ jobs:
           apiVersion: v1
           clusters:
           - cluster:
-              server: http://localhost:8443
+              server: https://localhost:8443
               certificate-authority-data: ${{ secrets.K8S_CA_CERT }}
               insecure-skip-tls-verify: true
             name: k8s-cluster
@@ -92,13 +92,13 @@ jobs:
           echo "? Exit code: $?"
 
           # Ïðîâåðÿåì äîñòóïíîñòü Kubernetes API — ÎÁßÇÀÒÅËÜÍÎ ñ --kubeconfig
-          #echo "?? Checking Kubernetes API..."
-          #if kubectl --kubeconfig ~/.kube/config cluster-info --insecure-skip-tls-verify 2>/dev/null; then
-          #  echo "? Kubernetes API is available!"
-          #else
-          #  echo "? Kubernetes API is not reachable!"
-          #  exit 1
-          #fi
+          echo "?? Checking Kubernetes API..."
+          if kubectl --kubeconfig ~/.kube/config cluster-info --insecure-skip-tls-verify --no-headers 2>/dev/null; then
+            echo "? Kubernetes API is available!"
+          else
+            echo "? Kubernetes API is not reachable!"
+            exit 1
+          fi
 
           # ?? ÍÅ ÓÁÈÂÀÅÌ ÒÓÍÍÅËÜ — îí íóæåí äëÿ Helm!
           # kill $SSH_PID 2>/dev/null || true   # <-- ÍÅ ÐÀÑÊÎÌÌÅÍÒÈÐÓÉÒÅ!
