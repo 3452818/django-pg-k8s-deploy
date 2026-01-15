@@ -45,7 +45,7 @@ jobs:
         run: |
           mkdir -p ~/.kube
 
-          # ? ÈÑÏÎËÜÇÓÅÌ HTTP — ÏÎÒÎÌÓ ×ÒÎ ÒÓÍÍÅËÜ — TCP-ÏÐÎÁÐÎÑ
+          # Ñîçäà¸ì kubeconfig ñ HTTP-àäðåñîì è îòêëþ÷åííîé ïðîâåðêîé TLS
           cat > ~/.kube/config <<EOF
           apiVersion: v1
           clusters:
@@ -67,15 +67,16 @@ jobs:
               token: ${{ secrets.K8S_TOKEN }}
           EOF
 
+          # Ñîõðàíÿåì SSH-êëþ÷
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
-          # Çàïóñêàåì SSH-òóííåëü
+          # Çàïóñêàåì SSH-òóííåëü: runner:8443 > ñåðâåð:192.168.10.27:6443
           ssh -N -L 8443:192.168.10.27:6443 ubuntu@178.154.228.207 -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 &
-
           SSH_PID=$!
 
+          # Æä¸ì, ïîêà òóííåëü ñòàíåò äîñòóïåí
           echo "? Waiting for SSH tunnel to establish on localhost:8443..."
           for i in {1..15}; do
             if echo exit | telnet localhost 8443 2>/dev/null; then
@@ -86,6 +87,17 @@ jobs:
             sleep 1
           done
 
+          # Ïðîâåðÿåì äîñòóïíîñòü Kubernetes API — ÎÁßÇÀÒÅËÜÍÎ ñ --kubeconfig
+          echo "?? Checking Kubernetes API..."
+          if kubectl --kubeconfig ~/.kube/config cluster-info --insecure-skip-tls-verify 2>/dev/null; then
+            echo "? Kubernetes API is available!"
+          else
+            echo "? Kubernetes API is not reachable!"
+            exit 1
+          fi
+
+          # ?? ÍÅ ÓÁÈÂÀÅÌ ÒÓÍÍÅËÜ — îí íóæåí äëÿ Helm!
+          # kill $SSH_PID 2>/dev/null || true   # <-- ÍÅ ÐÀÑÊÎÌÌÅÍÒÈÐÓÉÒÅ!
 
       - name: Deploy with Helm
         run: |
@@ -102,5 +114,5 @@ jobs:
       - name: Show deployed resources
         run: |
           echo "?? Deployed resources:"
-          kubectl get pods -n default --insecure-skip-tls-verify
-          kubectl get svc -n default --insecure-skip-tls-verify
+          kubectl --kubeconfig ~/.kube/config get pods -n default --insecure-skip-tls-verify
+          kubectl --kubeconfig ~/.kube/config get svc -n default --insecure-skip-tls-verify
