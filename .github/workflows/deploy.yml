@@ -70,27 +70,27 @@ jobs:
           ssh -N -L 8443:192.168.10.27:6443 ubuntu@178.154.228.207 -i <(echo "${{ secrets.SSH_PRIVATE_KEY }}") &
           SSH_PID=$!
 
-          # Ждём, пока туннель установится (максимум 30 секунд)
-          echo "Ожидание установки SSH-туннеля..."
-          for i in {1..30}; do
+          # Ждём, пока туннель установится (максимум 10 секунд)
+          echo "Wait SSH.."
+          for i in {1..10}; do
             if echo exit | telnet localhost 8443 2>/dev/null; then
-              echo "SSH-туннель успешно установлен!"
+              echo "SSH-OK!"
               break
             fi
-            echo "Ожидание... ($i/30)"
+            echo "Wait... ($i/10)"
             sleep 1
           done
 
-          # Проверяем доступность Kubernetes API через туннель
-          echo "Проверка доступности Kubernetes API..."
+          # Check Kubernetes API
+          echo "Check Kubernetes API..."
           if kubectl cluster-info 2>/dev/null; then
-            echo "Kubernetes API доступен через туннель."
+            echo "Kubernetes API avalable"
           else
-            echo "Ошибка: Kubernetes API недоступен."
+            echo "Error: Kubernetes API not avalable."
             exit 1
           fi
 
-          # Убиваем SSH-туннель после завершения шага (он автоматически убьётся, но явно для чистоты)
+          # kill SSH-tunel
           kill $SSH_PID 2>/dev/null || true
 
       - name: Deploy with Helm
