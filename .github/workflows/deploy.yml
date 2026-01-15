@@ -86,17 +86,6 @@ jobs:
             sleep 1
           done
 
-          # ? Ïðîâåðÿåì API — ñ --insecure-skip-tls-verify
-          echo "?? Checking Kubernetes API..."
-          if kubectl cluster-info --insecure-skip-tls-verify 2>/dev/null; then
-            echo "? Kubernetes API is available!"
-          else
-            echo "? Kubernetes API is not reachable!"
-            exit 1
-          fi
-
-          # ? ÍÅ ÓÁÈÂÀÅÌ ÒÓÍÍÅËÜ — îí íóæåí äëÿ Helm!
-          # kill $SSH_PID 2>/dev/null || true   # <-- ÓÁÐÀÍÎ!
 
       - name: Deploy with Helm
         run: |
