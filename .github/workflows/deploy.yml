@@ -110,7 +110,7 @@ jobs:
             --set image.tag=${{ steps.tag.outputs.TAG }} \
             --wait \
             --timeout 600s \
-            --debug 
+            --debug \
             --kubeconfig ~/.kube/config
 
       - name: Show deployed resources
