@@ -23,7 +23,7 @@ postgres:
     POSTGRES_PASSWORD: password
   persistence:
     enabled: true
-    storageClass: ""
+    storageClass: "local-path"
     size: 1Gi
   service:
     port: 5432
