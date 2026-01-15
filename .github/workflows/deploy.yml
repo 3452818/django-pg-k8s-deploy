@@ -43,12 +43,15 @@ jobs:
 
       - name: Configure Kubeconfig and establish SSH tunnel
         run: |
+          # Создаём директорию для kubeconfig
           mkdir -p ~/.kube
+
+          # Записываем kubeconfig с локальным хостом (через туннель)
           cat > ~/.kube/config <<EOF
           apiVersion: v1
           clusters:
           - cluster:
-              server: https://localhost:8443
+              server: http://localhost:8443
               certificate-authority-data: ${{ secrets.K8S_CA_CERT }}
             name: k8s-cluster
           contexts:
@@ -64,45 +67,57 @@ jobs:
               token: ${{ secrets.K8S_TOKEN }}
           EOF
 
-          # Запускаем SSH-туннель в фоне без -f, чтобы он не умирал после шага
-          # Используем ssh -N -L для проброса порта, но без -f — GitHub Actions не поддерживает долгоживущие фоновые процессы
-          # Поэтому запускаем туннель в фоне с & и ждём, пока порт станет доступен
-          ssh -N -L 8443:192.168.10.27:6443 ubuntu@178.154.228.207 -i <(echo "${{ secrets.SSH_PRIVATE_KEY }}") &
+          # Создаём директорию для SSH-ключа
+          mkdir -p ~/.ssh
+
+          # Сохраняем приватный ключ в файл (обязательно в формате PEM)
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+
+          # Устанавливаем правильные права (SSH требует 600)
+          chmod 600 ~/.ssh/id_rsa
+
+          # Запускаем SSH-туннель в фоне (без -f, но с &, и игнорируем проверку хоста)
+          ssh -N -L 8443:192.168.10.27:6443 ubuntu@178.154.228.207 -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 &
+
+          # Сохраняем PID туннеля
           SSH_PID=$!
 
-          # Ждём, пока туннель установится (максимум 10 секунд)
-          echo "Wait SSH.."
-          for i in {1..10}; do
+          # Ждём, пока туннель станет доступен (максимум 15 секунд)
+          echo "? Waiting for SSH tunnel to establish on localhost:8443..."
+          for i in {1..15}; do
             if echo exit | telnet localhost 8443 2>/dev/null; then
-              echo "SSH-OK!"
+              echo "? SSH tunnel is ready!"
               break
             fi
-            echo "Wait... ($i/10)"
+            echo "? Waiting... ($i/15)"
             sleep 1
           done
 
-          # Check Kubernetes API
-          echo "Check Kubernetes API..."
+          # Проверяем доступность Kubernetes API
+          echo "?? Checking Kubernetes API..."
           if kubectl cluster-info 2>/dev/null; then
-            echo "Kubernetes API avalable"
+            echo "? Kubernetes API is available!"
           else
-            echo "Error: Kubernetes API not avalable."
+            echo "? Kubernetes API is not reachable!"
             exit 1
           fi
 
-          # kill SSH-tunel
-          kill $SSH_PID 2>/dev/null || true
+          # ? НЕ УБИВАЕМ ТУННЕЛЬ! Он нужен для Helm!
+          # kill $SSH_PID 2>/dev/null || true   # <-- УБРАНО! НЕ УБИВАЕМ!
 
       - name: Deploy with Helm
         run: |
+          echo "?? Deploying Helm chart..."
           helm upgrade --install django-pg-app ./helm/django-pg-app \
             --namespace default \
             --create-namespace \
             --set image.tag=${{ steps.tag.outputs.TAG }} \
             --wait \
-            --timeout 300s
+            --timeout 600s \
+            --debug
 
       - name: Show deployed resources
         run: |
+          echo "?? Deployed resources:"
           kubectl get pods -n default
           kubectl get svc -n default
