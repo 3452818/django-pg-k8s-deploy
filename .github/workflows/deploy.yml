@@ -40,7 +40,7 @@ jobs:
         apiVersion: v1
         clusters:
         - cluster:
-            server: https://178.154.228.207:6443
+            server: https://localhost:8443
             certificate-authority-data: ${{ secrets.K8S_CA_CERT }}
           name: k8s-cluster
         contexts:
@@ -55,6 +55,15 @@ jobs:
           user:
             token: ${{ secrets.K8S_TOKEN }}
         EOF
+    # Запускаем SSH-туннель в фоне (перенаправляем localhost:8443 > 192.168.10.27:6443)
+        ssh -f -N -L 8443:192.168.10.27:6443 ubuntu@178.154.228.207 -i <(echo "${{ secrets.SSH_PRIVATE_KEY }}")
+
+    # Ждём, пока туннель заработает
+       sleep 10
+
+    # Проверяем, что туннель работает
+       curl -k https://localhost:8443/healthz
+
     - name: Deploy with Helm
       run: |
         helm upgrade --install django-pg-app ./helm/django-pg-app \
