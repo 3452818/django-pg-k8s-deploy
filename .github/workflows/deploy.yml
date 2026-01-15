@@ -51,8 +51,9 @@ jobs:
           apiVersion: v1
           clusters:
           - cluster:
-              server: http://localhost:8443
+              server: https://localhost:8443
               certificate-authority-data: ${{ secrets.K8S_CA_CERT }}
+              insecure-skip-tls-verify: true
             name: k8s-cluster
           contexts:
           - context:
@@ -102,8 +103,6 @@ jobs:
             exit 1
           fi
 
-          # ? ÍÅ ÓÁÈÂÀÅÌ ÒÓÍÍÅËÜ! Îí íóæåí äëÿ Helm!
-          # kill $SSH_PID 2>/dev/null || true   # <-- ÓÁÐÀÍÎ! ÍÅ ÓÁÈÂÀÅÌ!
 
       - name: Deploy with Helm
         run: |
