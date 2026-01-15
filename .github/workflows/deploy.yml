@@ -93,7 +93,7 @@ jobs:
 
           # Ïðîâåðÿåì äîñòóïíîñòü Kubernetes API — ÎÁßÇÀÒÅËÜÍÎ ñ --kubeconfig
           echo "?? Checking Kubernetes API..."
-          if kubectl --kubeconfig ~/.kube/config cluster-info --insecure-skip-tls-verify --no-headers 2>/dev/null; then
+          if kubectl --kubeconfig ~/.kube/config get componentstatuses --insecure-skip-tls-verify --no-headers 2>/dev/null; then
             echo "? Kubernetes API is available!"
           else
             echo "? Kubernetes API is not reachable!"
