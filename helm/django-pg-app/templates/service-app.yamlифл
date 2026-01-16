@@ -1,0 +1,15 @@
+# helm/django-pg-app/templates/service-app.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: django-pg-app
+  labels:
+    app: django-pg-app
+spec:
+  type: NodePort
+  ports:
+  - port: {{ .Values.app.port }}
+    targetPort: {{ .Values.app.port }}
+    nodePort: 30030
+  selector:
+    app: django-pg-app
