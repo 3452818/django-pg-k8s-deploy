@@ -24,3 +24,5 @@ COPY ./app /app
 RUN adduser -D user
 
 USER user
+
+CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:3003"]
