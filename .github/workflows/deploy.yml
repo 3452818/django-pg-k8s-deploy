@@ -57,12 +57,12 @@ jobs:
           contexts:
           - context:
               cluster: k8s-cluster
-              user: k8s-user
+              user: github-actions
             name: k8s-context
           current-context: k8s-context
           kind: Config
           users:
-          - name: k8s-user
+          - name: github-actions
             user:
               token: ${{ secrets.K8S_TOKEN }}
           EOF
