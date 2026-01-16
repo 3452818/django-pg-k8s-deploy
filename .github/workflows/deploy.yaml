@@ -45,7 +45,7 @@ jobs:
         run: |
           mkdir -p ~/.kube
 
-          # Создаём kubeconfig с HTTP-адресом и отключенной проверкой TLS
+          #        kubeconfig   HTTP-                                TLS
           cat > ~/.kube/config <<EOF
           apiVersion: v1
           clusters:
@@ -67,16 +67,16 @@ jobs:
               token: ${{ secrets.K8S_TOKEN }}
           EOF
 
-          # Сохраняем SSH-ключ
+          #           SSH-    
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
-          # Запускаем SSH-туннель: runner:8443 > сервер:192.168.10.27:6443
+          #           SSH-       : runner:8443 >       :192.168.10.27:6443
           ssh -N -L 8443:192.168.10.27:6443 ubuntu@178.154.228.207 -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 &
           SSH_PID=$!
 
-          # Ждём, пока туннель станет доступен
+          #    ,                             
           echo "? Waiting for SSH tunnel to establish on localhost:8443..."
           for i in {1..15}; do
             if echo exit | telnet localhost 8443 2>/dev/null; then
@@ -86,6 +86,20 @@ jobs:
             echo "? Waiting... ($i/15)"
             sleep 1
           done
+
+#          echo "?? Testing connection with kubectl..."
+#          kubectl --kubeconfig ~/.kube/config cluster-info --insecure-skip-tls-verify
+#          echo "? Exit code: $?"
+
+          #                       Kubernetes API                 --kubeconfig
+#          echo "?? Checking Kubernetes API..."
+#          if kubectl --kubeconfig ~/.kube/config get componentstatuses --insecure-skip-tls-verify --no-headers 2>/dev/null | grep -q "Healthy"; then
+#            echo "? Kubernetes API is available!"
+#          else
+#            echo "? Kubernetes API is not reachable!"
+#            exit 1
+#          fi
+
 
       - name: Deploy with Helm
         run: |
