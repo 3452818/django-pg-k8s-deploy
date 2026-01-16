@@ -1,0 +1,106 @@
+name: Deploy Django App to Kubernetes
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.DOCKER_REGISTRY_TOKEN }}
+
+      - name: Extract Git tag
+        id: tag
+        run: |
+          echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ steps.tag.outputs.TAG }}
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Configure Kubeconfig and establish SSH tunnel
+        run: |
+          mkdir -p ~/.kube
+
+          # Создаём kubeconfig с HTTP-адресом и отключенной проверкой TLS
+          cat > ~/.kube/config <<EOF
+          apiVersion: v1
+          clusters:
+          - cluster:
+              server: https://localhost:8443
+             # certificate-authority-data: ${{ secrets.K8S_CA_CERT }}
+              insecure-skip-tls-verify: true
+            name: k8s-cluster
+          contexts:
+          - context:
+              cluster: k8s-cluster
+              user: github-actions
+            name: k8s-context
+          current-context: k8s-context
+          kind: Config
+          users:
+          - name: github-actions
+            user:
+              token: ${{ secrets.K8S_TOKEN }}
+          EOF
+
+          # Сохраняем SSH-ключ
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+          # Запускаем SSH-туннель: runner:8443 > сервер:192.168.10.27:6443
+          ssh -N -L 8443:192.168.10.27:6443 ubuntu@178.154.228.207 -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 &
+          SSH_PID=$!
+
+          # Ждём, пока туннель станет доступен
+          echo "? Waiting for SSH tunnel to establish on localhost:8443..."
+          for i in {1..15}; do
+            if echo exit | telnet localhost 8443 2>/dev/null; then
+              echo "? SSH tunnel is ready!"
+              break
+            fi
+            echo "? Waiting... ($i/15)"
+            sleep 1
+          done
+
+      - name: Deploy with Helm
+        run: |
+          echo "?? Deploying Helm chart..."
+          helm upgrade --install django-pg-app ./helm/django-pg-app \
+            --namespace default \
+            --create-namespace \
+            --set image.tag=${{ steps.tag.outputs.TAG }} \
+            --wait \
+            --timeout 600s \
+            --debug \
+            --kubeconfig ~/.kube/config
+
+      - name: Show deployed resources
+        run: |
+          echo "?? Deployed resources:"
+          kubectl --kubeconfig ~/.kube/config get pods -n default --insecure-skip-tls-verify
+          kubectl --kubeconfig ~/.kube/config get svc -n default --insecure-skip-tls-verify
