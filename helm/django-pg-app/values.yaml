@@ -1,5 +1,4 @@
 # helm/django-pg-app/values.yaml
-
 image:
   repository: ghcr.io/3452818/django-pg-k8s-deploy
   tag: latest
@@ -11,33 +10,20 @@ app:
     DB_HOST: django-pg-app-postgresql
     DB_NAME: tutorial-dev
     DB_USER: vinhle
-    DB_PASS:
-      secretKeyRef:
-        name: django-secrets
-        key: DB_PASS
+    DB_PASS: password
 
-deployment:
-  nodeSelector:
-    node-role.kubernetes.io/worker: ""
-  tolerations: []
-
-postgresql:
+postgres:
   enabled: true
   image:
     repository: postgres
-    tag: 13-alpine   
-  auth:
-    postgresPassword: "password"     
-    database: "tutorial-dev"
-    username: "vinhle"
-    password: "password"
+    tag: 13-alpine
+  env:
+    POSTGRES_DB: tutorial-dev
+    POSTGRES_USER: vinhle
+    POSTGRES_PASSWORD: password
   persistence:
     enabled: true
-    storageClassName: "local-path"
+    storageClass: "local-path"
     size: 1Gi
-    accessMode: ReadWriteOnce
   service:
     port: 5432
-  nodeSelector:
-    node-role.kubernetes.io/worker: ""
-  tolerations: []
